@@ -27,6 +27,9 @@ jobs:
         run: |
           npm install
           npx cap add android
+          rm -f ~/.android/debug.keystore
+          mkdir -p ~/.android
+          keytool -genkey -v -keystore ~/.android/debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Limpiador,O=Android,C=MX" -noprompt
           python3 -c '
           p = "android/app/src/main/AndroidManifest.xml"
           txt = open(p).read()
@@ -39,7 +42,6 @@ jobs:
           """
           txt = txt.replace("<application", perms + "\n    <application", 1)
           open(p, "w").write(txt)
-          print(open(p).read())
           '
           npx cap sync android
 

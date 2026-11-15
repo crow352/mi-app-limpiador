@@ -3,56 +3,90 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Limpiador</title>
+    <title>Limpiador Seguro</title>
     <style>
-        body { background: #121212; color: #e0e0e0; font-family: sans-serif; padding: 20px; padding-bottom: 90px; }
-        .btn { background: #bb86fc; color: #000; border: none; padding: 15px; width: 100%; border-radius: 8px; font-weight: bold; margin-bottom: 12px; font-size: 16px; }
-        .btn-sec { background: #2c2c2c; color: #e0e0e0; padding: 10px; font-size: 14px; }
+        body { background: #121212; color: #e0e0e0; font-family: sans-serif; padding: 16px; padding-bottom: 100px; margin: 0; }
+        .tabs { display: flex; gap: 8px; margin-bottom: 14px; }
+        .tab { flex: 1; background: #1e1e1e; color: #aaa; border: 1px solid #333; padding: 12px; border-radius: 8px; font-weight: bold; font-size: 14px; }
+        .tab.active { background: #bb86fc; color: #000; border-color: #bb86fc; }
+        .btn { background: #bb86fc; color: #000; border: none; padding: 14px; width: 100%; border-radius: 8px; font-weight: bold; margin-bottom: 12px; font-size: 15px; }
         .btn-danger { background: #cf6679; color: #000; }
-        #status { background: #1e1e1e; padding: 12px; border-radius: 8px; margin-bottom: 15px; font-size: 14px; color: #03dac6; }
-        .cat-title { color: #bb86fc; font-weight: bold; margin-top: 18px; margin-bottom: 8px; border-bottom: 1px solid #333; padding-bottom: 4px; }
-        .file-item { display: flex; align-items: center; padding: 10px 5px; border-bottom: 1px solid #262626; word-break: break-all; font-size: 14px; }
-        .file-item input { margin-right: 12px; transform: scale(1.3); flex-shrink: 0; }
-        .footer-bar { position: fixed; bottom: 0; left: 0; right: 0; background: #1e1e1e; padding: 12px 20px; border-top: 1px solid #333; }
-        #total { margin-bottom: 8px; font-weight: bold; font-size: 16px; }
+        .btn-restore { background: #03dac6; color: #000; padding: 6px 10px; border: none; border-radius: 6px; font-weight: bold; font-size: 12px; margin-left: auto; }
+        #status { background: #1e1e1e; padding: 12px; border-radius: 8px; margin-bottom: 14px; font-size: 13px; color: #03dac6; }
+        .cat-header { display: flex; justify-content: space-between; align-items: center; margin-top: 18px; margin-bottom: 8px; border-bottom: 1px solid #333; padding-bottom: 6px; }
+        .cat-title { color: #bb86fc; font-weight: bold; font-size: 14px; }
+        .btn-mini { background: #2c2c2c; color: #e0e0e0; border: 1px solid #444; padding: 4px 8px; border-radius: 6px; font-size: 12px; }
+        .file-item { display: flex; align-items: center; padding: 10px 4px; border-bottom: 1px solid #262626; word-break: break-all; font-size: 13px; gap: 10px; }
+        .file-item input { transform: scale(1.3); flex-shrink: 0; }
+        .thumb { width: 46px; height: 46px; object-fit: cover; border-radius: 6px; border: 1px solid #444; flex-shrink: 0; }
+        .footer-bar { position: fixed; bottom: 0; left: 0; right: 0; background: #1e1e1e; padding: 12px 16px; border-top: 1px solid #333; }
+        #total { margin-bottom: 8px; font-weight: bold; font-size: 15px; }
+        #modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.9); justify-content: center; align-items: center; z-index: 99; padding: 20px; }
+        #modal img { max-width: 100%; max-height: 85vh; border-radius: 8px; }
     </style>
 </head>
 <body>
-    <h1>Limpiador Seguro</h1>
-    <button class="btn" onclick="scan()">Escanear almacenamiento</button>
-    <div id="status">Toca escanear para buscar archivos seguros de limpiar.</div>
-    <button id="toggleBtn" class="btn btn-sec" style="display:none;" onclick="toggleAll()">Marcar / Desmarcar todos</button>
-    <div id="results"></div>
-
-    <div class="footer-bar">
-        <div id="total">Total seleccionado: 0.00 MB</div>
-        <button class="btn btn-danger" style="margin-bottom:0;" onclick="deleteFiles()">Eliminar seleccionados</button>
+    <h2 style="margin-top:0;">Limpiador Seguro</h2>
+    <div class="tabs">
+        <button id="tabScan" class="tab active" onclick="switchTab('scan')">🧹 Escanear</button>
+        <button id="tabTrash" class="tab" onclick="switchTab('trash')">♻️ Papelera (<span id="trashCount">0</span>)</button>
     </div>
-
+    <div id="viewScan">
+        <button class="btn" onclick="scan()">Escanear almacenamiento</button>
+        <div id="status">Toca escanear para analizar carpetas seguras.</div>
+        <div id="results"></div>
+    </div>
+    <div id="viewTrash" style="display:none;">
+        <div style="font-size:13px; color:#aaa; margin-bottom:12px;">Los archivos eliminados se guardan aquí por seguridad. Puedes restaurarlos o borrarlos definitivamente.</div>
+        <button class="btn btn-danger" onclick="emptyTrash()">Vaciar papelera definitivamente</button>
+        <div id="trashList"></div>
+    </div>
+    <div id="footerBar" class="footer-bar">
+        <div id="total">Total seleccionado: 0.00 MB</div>
+        <button class="btn btn-danger" style="margin-bottom:0;" onclick="moveToTrash()">Mover seleccionados a Papelera</button>
+    </div>
+    <div id="modal" onclick="this.style.display='none'"><img id="modalImg" src=""></div>
     <script>
-        let allChecked = false;
+        const TRASH_DIR = '.papelera_limpiador';
+
+        function switchTab(tab) {
+            document.getElementById('tabScan').classList.toggle('active', tab === 'scan');
+            document.getElementById('tabTrash').classList.toggle('active', tab === 'trash');
+            document.getElementById('viewScan').style.display = tab === 'scan' ? 'block' : 'none';
+            document.getElementById('viewTrash').style.display = tab === 'trash' ? 'block' : 'none';
+            document.getElementById('footerBar').style.display = tab === 'scan' ? 'block' : 'none';
+            if (tab === 'trash') loadTrash();
+        }
+
+        async function ensureTrashDir(Filesystem) {
+            try { await Filesystem.mkdir({ path: TRASH_DIR, directory: 'EXTERNAL_STORAGE', recursive: true }); } catch (e) {}
+        }
+
+        async function updateTrashCount() {
+            const Filesystem = window.Capacitor?.Plugins?.Filesystem;
+            if (!Filesystem) return;
+            try {
+                const res = await Filesystem.readdir({ path: TRASH_DIR, directory: 'EXTERNAL_STORAGE' });
+                document.getElementById('trashCount').innerText = res.files.length;
+            } catch (e) { document.getElementById('trashCount').innerText = '0'; }
+        }
 
         async function scan() {
             const status = document.getElementById('status');
             const container = document.getElementById('results');
-            const toggleBtn = document.getElementById('toggleBtn');
             container.innerHTML = '';
-            toggleBtn.style.display = 'none';
-            allChecked = false;
             document.getElementById('total').innerText = 'Total seleccionado: 0.00 MB';
 
             const Filesystem = window.Capacitor?.Plugins?.Filesystem;
-            if (!Filesystem) {
-                status.innerText = 'Error: Plugin Filesystem no cargado.';
-                return;
-            }
+            if (!Filesystem) { status.innerText = 'Error: Plugin no cargado.'; return; }
 
             status.innerText = 'Escaneando carpetas...';
             try { await Filesystem.requestPermissions(); } catch (e) {}
+            await updateTrashCount();
 
             const groups = {
-                '📦 Instaladores y ZIPs (Download)': [],
                 '🗑️ Temporales y residuos': [],
+                '📦 Instaladores y ZIPs (Download)': [],
                 '📸 Capturas de pantalla': [],
                 '🐘 Archivos grandes (+5 MB en Download)': []
             };
@@ -67,56 +101,62 @@
                         if (file.type === 'directory') continue;
                         const sizeMB = (file.size || 0) / (1024 * 1024);
                         const ext = file.name.split('.').pop().toLowerCase();
-                        const item = { path: `${path}/${file.name}`, name: file.name, sizeMB };
+                        const item = { path: `${path}/${file.name}`, folder: path, name: file.name, sizeMB, isImg: ['jpg','jpeg','png','webp'].includes(ext) };
 
-                        if (['apk', 'zip', 'rar'].includes(ext)) {
-                            groups['📦 Instaladores y ZIPs (Download)'].push(item);
-                        } else if (['tmp', 'temp', 'log', 'bak'].includes(ext)) {
-                            groups['🗑️ Temporales y residuos'].push(item);
-                        } else if (path.includes('Screenshots')) {
-                            groups['📸 Capturas de pantalla'].push(item);
-                        } else if (path === 'Download' && sizeMB > 5) {
-                            groups['🐘 Archivos grandes (+5 MB en Download)'].push(item);
-                        }
+                        if (['tmp', 'temp', 'log', 'bak'].includes(ext)) groups['🗑️ Temporales y residuos'].push(item);
+                        else if (['apk', 'zip', 'rar'].includes(ext)) groups['📦 Instaladores y ZIPs (Download)'].push(item);
+                        else if (path.includes('Screenshots')) groups['📸 Capturas de pantalla'].push(item);
+                        else if (path === 'Download' && sizeMB > 5) groups['🐘 Archivos grandes (+5 MB en Download)'].push(item);
                     }
                 } catch (err) {
-                    const msg = (err.message || '').toLowerCase();
-                    if (!msg.includes('does not exist')) {
-                        permissionError = true;
-                    }
+                    if (!(err.message || '').toLowerCase().includes('does not exist')) permissionError = true;
                 }
             }
-
             let totalFound = 0;
+            let catIndex = 0;
             for (const [title, items] of Object.entries(groups)) {
                 if (items.length === 0) continue;
                 totalFound += items.length;
-                const h = document.createElement('div');
-                h.className = 'cat-title';
-                h.innerText = `${title} (${items.length})`;
-                container.appendChild(h);
+                const catId = `cat_${catIndex++}`;
+
+                const header = document.createElement('div');
+                header.className = 'cat-header';
+                header.innerHTML = `<span class="cat-title">${title} (${items.length})</span><button class="btn-mini" onclick="toggleCat('${catId}')">Marcar grupo</button>`;
+                container.appendChild(header);
+
+                const groupDiv = document.createElement('div');
+                groupDiv.id = catId;
+                groupDiv.dataset.checked = 'false';
 
                 for (const item of items) {
                     const div = document.createElement('div');
                     div.className = 'file-item';
-                    div.innerHTML = `<input type="checkbox" class="file-chk" data-path="${item.path}" data-size="${item.sizeMB}" onchange="updateTotal()"> <span>${item.name} <b>(${item.sizeMB.toFixed(2)} MB)</b></span>`;
-                    container.appendChild(div);
+                    let thumbHtml = '';
+                    if (item.isImg && window.Capacitor?.convertFileSrc) {
+                        const src = window.Capacitor.convertFileSrc(`file:///storage/emulated/0/${item.path}`);
+                        thumbHtml = `<img class="thumb" src="${src}" loading="lazy" onclick="showImg('${src}')">`;
+                    }
+                    div.innerHTML = `<input type="checkbox" class="file-chk" data-path="${item.path}" data-folder="${item.folder}" data-name="${item.name}" data-size="${item.sizeMB}" onchange="updateTotal()">${thumbHtml}<span>${item.name} <b>(${item.sizeMB.toFixed(2)} MB)</b></span>`;
+                    groupDiv.appendChild(div);
                 }
+                container.appendChild(groupDiv);
             }
 
-            if (totalFound > 0) {
-                status.innerText = `Listo: ${totalFound} archivos seguros para revisar.`;
-                toggleBtn.style.display = 'block';
-            } else if (permissionError) {
-                status.innerText = 'Sin acceso a archivos: Ve a Ajustes > Apps > Mi App Limpiador > Permisos y activa "Acceso a todos los archivos".';
-            } else {
-                status.innerText = '¡Todo limpio! No se encontraron archivos en estas categorías.';
-            }
+            if (totalFound > 0) status.innerText = `Listo: ${totalFound} archivos encontrados.`;
+            else if (permissionError) status.innerText = 'Activa "Acceso a todos los archivos" en Ajustes > Aplicaciones > Mi App Limpiador.';
+            else status.innerText = '¡Todo limpio! No se encontraron archivos en estas categorías.';
         }
 
-        function toggleAll() {
-            allChecked = !allChecked;
-            document.querySelectorAll('.file-chk').forEach(c => c.checked = allChecked);
+        function showImg(src) {
+            document.getElementById('modalImg').src = src;
+            document.getElementById('modal').style.display = 'flex';
+        }
+
+        function toggleCat(catId) {
+            const box = document.getElementById(catId);
+            const next = box.dataset.checked !== 'true';
+            box.dataset.checked = next;
+            box.querySelectorAll('.file-chk').forEach(c => c.checked = next);
             updateTotal();
         }
 
@@ -126,25 +166,85 @@
             document.getElementById('total').innerText = `Total seleccionado: ${total.toFixed(2)} MB`;
         }
 
-        async function deleteFiles() {
+        async function moveToTrash() {
             const Filesystem = window.Capacitor?.Plugins?.Filesystem;
             const selected = document.querySelectorAll('.file-chk:checked');
             if (selected.length === 0) return;
 
-            if (confirm(`¿Eliminar ${selected.length} archivos seleccionados? Esta acción no se puede deshacer.`)) {
-                let deleted = 0;
-                for (const checkbox of selected) {
+            if (confirm(`¿Mover ${selected.length} archivos a la Papelera de seguridad?`)) {
+                await ensureTrashDir(Filesystem);
+                let moved = 0;
+                for (const chk of selected) {
                     try {
-                        await Filesystem.deleteFile({ path: checkbox.dataset.path, directory: 'EXTERNAL_STORAGE' });
-                        deleted++;
-                    } catch (e) {
-                        alert('No se pudo borrar ' + checkbox.dataset.path + ': ' + (e.message || e));
-                    }
+                        const safeFolder = chk.dataset.folder.replace(/\//g, '__');
+                        const trashName = `${safeFolder}___${Date.now()}___${chk.dataset.name}`;
+                        await Filesystem.rename({
+                            from: chk.dataset.path,
+                            to: `${TRASH_DIR}/${trashName}`,
+                            directory: 'EXTERNAL_STORAGE',
+                            toDirectory: 'EXTERNAL_STORAGE'
+                        });
+                        moved++;
+                    } catch (e) { alert('Error moviendo ' + chk.dataset.name + ': ' + (e.message || e)); }
                 }
-                alert(`Se eliminaron ${deleted} archivos.`);
+                alert(`${moved} archivos movidos a la Papelera.`);
                 scan();
             }
         }
+
+        async function loadTrash() {
+            const Filesystem = window.Capacitor?.Plugins?.Filesystem;
+            const list = document.getElementById('trashList');
+            list.innerHTML = 'Cargando...';
+            try {
+                const res = await Filesystem.readdir({ path: TRASH_DIR, directory: 'EXTERNAL_STORAGE' });
+                list.innerHTML = '';
+                if (res.files.length === 0) { list.innerHTML = '<div style="color:#888; padding:20px 0;">La papelera está vacía.</div>'; return; }
+                for (const file of res.files) {
+                    const parts = file.name.split('___');
+                    const origName = parts.length === 3 ? parts[2] : file.name;
+                    const sizeMB = (file.size || 0) / (1024 * 1024);
+                    const div = document.createElement('div');
+                    div.className = 'file-item';
+                    div.innerHTML = `<span>${origName} <b>(${sizeMB.toFixed(2)} MB)</b></span><button class="btn-restore" onclick="restoreFile('${file.name}')">Restaurar</button>`;
+                    list.appendChild(div);
+                }
+            } catch (e) { list.innerHTML = '<div style="color:#888; padding:20px 0;">La papelera está vacía.</div>'; }
+        }
+
+        async function restoreFile(trashName) {
+            const Filesystem = window.Capacitor?.Plugins?.Filesystem;
+            const parts = trashName.split('___');
+            const origFolder = parts.length === 3 ? parts[0].replace(/__/g, '/') : 'Download';
+            const origName = parts.length === 3 ? parts[2] : trashName;
+            try {
+                await Filesystem.rename({
+                    from: `${TRASH_DIR}/${trashName}`,
+                    to: `${origFolder}/${origName}`,
+                    directory: 'EXTERNAL_STORAGE',
+                    toDirectory: 'EXTERNAL_STORAGE'
+                });
+                alert(`Restaurado a ${origFolder}/${origName}`);
+                loadTrash();
+                updateTrashCount();
+            } catch (e) { alert('Error al restaurar: ' + (e.message || e)); }
+        }
+
+        async function emptyTrash() {
+            const Filesystem = window.Capacitor?.Plugins?.Filesystem;
+            if (!confirm('¿Vaciar toda la papelera? Ahora sí se borrarán definitivamente para liberar espacio.')) return;
+            try {
+                const res = await Filesystem.readdir({ path: TRASH_DIR, directory: 'EXTERNAL_STORAGE' });
+                for (const file of res.files) {
+                    await Filesystem.deleteFile({ path: `${TRASH_DIR}/${file.name}`, directory: 'EXTERNAL_STORAGE' });
+                }
+                alert('Papelera vaciada.');
+                loadTrash();
+                updateTrashCount();
+            } catch (e) {}
+        }
+
+        updateTrashCount();
     </script>
 </body>
 </html>
