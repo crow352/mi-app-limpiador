@@ -1,5 +1,6 @@
 {
-  "appId": "com.ejemplo.limpiador",
-  "appName": "Mi App Limpiador",
-  "webDir": "www"
+  "appId": "com.crow.clean",
+  "appName": "CrowClean",
+  "webDir": "www",
+  "bundledWebRuntime": false
 }

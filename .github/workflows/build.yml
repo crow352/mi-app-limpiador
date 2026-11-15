@@ -1,4 +1,4 @@
-name: Compilar APK Android
+name: Compilar CrowClean APK
 
 on:
   push:
@@ -23,14 +23,16 @@ jobs:
           distribution: 'temurin'
           java-version: '21'
 
-      - name: Instalar dependencias y configurar Android
+      - name: Instalar dependencias, ícono cuervo y Android
         run: |
           npm install
           npx cap add android
           rm -f ~/.android/debug.keystore
           mkdir -p ~/.android
-          keytool -genkey -v -keystore ~/.android/debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Limpiador,O=Android,C=MX" -noprompt
+          keytool -genkey -v -keystore ~/.android/debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=CrowClean,O=Crow,C=MX" -noprompt
           python3 -c '
+          import glob
+          from PIL import Image, ImageDraw
           p = "android/app/src/main/AndroidManifest.xml"
           txt = open(p).read()
           perms = """
@@ -42,17 +44,35 @@ jobs:
           """
           txt = txt.replace("<application", perms + "\n    <application", 1)
           open(p, "w").write(txt)
-          '
+
+          for icon_path in glob.glob("android/app/src/main/res/mipmap-*/ic_launcher*.png"):
+              im = Image.open(icon_path).convert("RGBA")
+              w, h = im.size
+              img = Image.new("RGBA", (w, h), (18, 18, 18, 255))
+              d = ImageDraw.Draw(img)
+              m = int(w * 0.06)
+              d.ellipse([m, m, w-m, h-m], fill=(28, 25, 42, 255), outline=(187, 134, 252, 255), width=max(2, w//24))
+              crow = [
+                  (w*0.20, h*0.74), (w*0.34, h*0.44), (w*0.46, h*0.26),
+                  (w*0.60, h*0.24), (w*0.82, h*0.32), (w*0.64, h*0.40),
+                  (w*0.62, h*0.56), (w*0.44, h*0.76)
+              ]
+              d.polygon(crow, fill=(187, 134, 252, 255))
+              d.ellipse([w*0.52, h*0.30, w*0.58, h*0.36], fill=(3, 218, 198, 255))
+              d.polygon([(w*0.76, h*0.54), (w*0.80, h*0.62), (w*0.88, h*0.66), (w*0.80, h*0.70), (w*0.76, h*0.78), (w*0.72, h*0.70), (w*0.64, h*0.66), (w*0.72, h*0.62)], fill=(3, 218, 198, 255))
+              img.save(icon_path)
+          ' || true
           npx cap sync android
 
-      - name: Compilar APK Debug
+      - name: Compilar CrowClean APK
         run: |
           cd android
           chmod +x gradlew
           ./gradlew assembleDebug
+          cp app/build/outputs/apk/debug/app-debug.apk ../CrowClean.apk
 
-      - name: Subir APK
+      - name: Subir CrowClean APK
         uses: actions/upload-artifact@v4
         with:
-          name: app-limpiador-debug
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          name: CrowClean-APK
+          path: CrowClean.apk

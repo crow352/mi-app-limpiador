@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Limpiador Seguro</title>
+    <title>CrowClean</title>
     <style>
         body { background: #121212; color: #e0e0e0; font-family: sans-serif; padding: 16px; padding-bottom: 100px; margin: 0; }
         .tabs { display: flex; gap: 8px; margin-bottom: 14px; }
@@ -26,14 +26,14 @@
     </style>
 </head>
 <body>
-    <h2 style="margin-top:0;">Limpiador Seguro</h2>
+    <h2 style="margin-top:0;">CrowClean</h2>
     <div class="tabs">
         <button id="tabScan" class="tab active" onclick="switchTab('scan')">🧹 Escanear</button>
         <button id="tabTrash" class="tab" onclick="switchTab('trash')">♻️ Papelera (<span id="trashCount">0</span>)</button>
     </div>
     <div id="viewScan">
         <button class="btn" onclick="scan()">Escanear almacenamiento</button>
-        <div id="status">Toca escanear para analizar carpetas seguras.</div>
+        <div id="status">Toca escanear. (Si es tu primera vez, activa "Acceso a todos los archivos" para CrowClean en Ajustes).</div>
         <div id="results"></div>
     </div>
     <div id="viewTrash" style="display:none;">
@@ -143,7 +143,7 @@
             }
 
             if (totalFound > 0) status.innerText = `Listo: ${totalFound} archivos encontrados.`;
-            else if (permissionError) status.innerText = 'Activa "Acceso a todos los archivos" en Ajustes > Aplicaciones > Mi App Limpiador.';
+            else if (permissionError) status.innerText = 'Activa "Acceso a todos los archivos" en Ajustes > Aplicaciones > CrowClean (Ajustes > Apps > CrowClean > Permisos .';
             else status.innerText = '¡Todo limpio! No se encontraron archivos en estas categorías.';
         }
 
