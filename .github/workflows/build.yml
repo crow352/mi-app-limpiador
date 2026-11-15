@@ -30,6 +30,7 @@ jobs:
           rm -f ~/.android/debug.keystore
           mkdir -p ~/.android
           keytool -genkey -v -keystore ~/.android/debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=CrowClean,O=Crow,C=MX" -noprompt
+          pip install pillow
           python3 -c '
           import glob
           from PIL import Image
