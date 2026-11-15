@@ -3,51 +3,74 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Storage Cleaner</title>
+    <title>Limpiador</title>
     <style>
         body { background: #121212; color: #e0e0e0; font-family: sans-serif; padding: 20px; }
-        .btn { background: #bb86fc; color: #000; border: none; padding: 15px; width: 100%; border-radius: 8px; font-weight: bold; margin-bottom: 20px; }
-        .file-item { display: flex; align-items: center; padding: 10px; border-bottom: 1px solid #333; }
-        .file-item input { margin-right: 15px; }
-        #total { margin: 20px 0; font-weight: bold; }
+        .btn { background: #bb86fc; color: #000; border: none; padding: 15px; width: 100%; border-radius: 8px; font-weight: bold; margin-bottom: 15px; font-size: 16px; }
+        .btn-danger { background: #cf6679; }
+        #status { background: #1e1e1e; padding: 12px; border-radius: 8px; margin-bottom: 15px; font-size: 14px; color: #03dac6; }
+        .file-item { display: flex; align-items: center; padding: 12px 5px; border-bottom: 1px solid #333; word-break: break-all; }
+        .file-item input { margin-right: 12px; transform: scale(1.3); }
+        #total { margin: 20px 0; font-weight: bold; font-size: 18px; }
     </style>
 </head>
 <body>
     <h1>Limpiador</h1>
     <button class="btn" onclick="scan()">Escanear carpetas seguras</button>
+    <div id="status">Listo para escanear.</div>
     <div id="results"></div>
-    <div id="total">Total seleccionado: 0 MB</div>
-    <button class="btn" onclick="deleteFiles()">Eliminar seleccionados</button>
+    <div id="total">Total seleccionado: 0.00 MB</div>
+    <button class="btn btn-danger" onclick="deleteFiles()">Eliminar seleccionados</button>
 
-    <script src="capacitor.js"></script>
     <script>
-        const { Filesystem, Directory } = Capacitor.Plugins;
-        let foundFiles = [];
-
         async function scan() {
-            await Filesystem.requestPermissions();
-            foundFiles = [];
-            const paths = ['Download', 'Pictures/Screenshots'];
+            const status = document.getElementById('status');
             const container = document.getElementById('results');
             container.innerHTML = '';
+            document.getElementById('total').innerText = 'Total seleccionado: 0.00 MB';
 
-            for (const path of paths) {
-                try {
-                    const contents = await Filesystem.readdir({ path, directory: Directory.ExternalStorage });
-                    for (const file of contents.files) {
-                        const stat = await Filesystem.stat({ path: `${path}/${file.name}`, directory: Directory.ExternalStorage });
-                        const ext = file.name.split('.').pop().toLowerCase();
-                        const sizeMB = stat.size / (1024 * 1024);
+            try {
+                const Filesystem = window.Capacitor?.Plugins?.Filesystem;
+                if (!Filesystem) {
+                    status.innerText = 'Error: Plugin Filesystem no cargado.';
+                    return;
+                }
 
-                        if (['apk', 'tmp', 'log', 'bak'].includes(ext) || (path === 'Download' && sizeMB > 50)) {
-                            foundFiles.push({ path: `${path}/${file.name}`, size: sizeMB });
-                            const div = document.createElement('div');
-                            div.className = 'file-item';
-                            div.innerHTML = `<input type="checkbox" data-path="${path}/${file.name}" data-size="${sizeMB}" onchange="updateTotal()"> <span>${file.name} (${sizeMB.toFixed(2)} MB)</span>`;
-                            container.appendChild(div);
+                status.innerText = 'Verificando permisos...';
+                try { await Filesystem.requestPermissions(); } catch (e) {}
+
+                const paths = ['Download', 'Pictures/Screenshots', 'DCIM/Screenshots'];
+                let count = 0;
+
+                for (const path of paths) {
+                    status.innerText = `Escaneando ${path}...`;
+                    try {
+                        const contents = await Filesystem.readdir({ path, directory: 'EXTERNAL_STORAGE' });
+                        for (const file of contents.files) {
+                            if (file.type === 'directory') continue;
+                            const sizeMB = (file.size || 0) / (1024 * 1024);
+                            const ext = file.name.split('.').pop().toLowerCase();
+
+                            if (['apk', 'tmp', 'log', 'bak'].includes(ext) || (path === 'Download' && sizeMB > 10)) {
+                                count++;
+                                const div = document.createElement('div');
+                                div.className = 'file-item';
+                                div.innerHTML = `<input type="checkbox" data-path="${path}/${file.name}" data-size="${sizeMB}" onchange="updateTotal()"> <span><b>[${path}]</b> ${file.name} (${sizeMB.toFixed(2)} MB)</span>`;
+                                container.appendChild(div);
+                            }
                         }
+                    } catch (err) {
+                        status.innerText = `Aviso en ${path}: ${err.message || err}. Revisa permisos de archivos en Ajustes.`;
                     }
-                } catch (e) { console.error(e); }
+                }
+
+                if (count > 0) {
+                    status.innerText = `Escaneo listo: ${count} archivos encontrados.`;
+                } else if (!status.innerText.startsWith('Aviso')) {
+                    status.innerText = 'Escaneo terminado: No se encontraron archivos basura o pesados.';
+                }
+            } catch (globalErr) {
+                status.innerText = 'Error: ' + (globalErr.message || globalErr);
             }
         }
 
@@ -58,12 +81,21 @@
         }
 
         async function deleteFiles() {
+            const Filesystem = window.Capacitor?.Plugins?.Filesystem;
             const selected = document.querySelectorAll('input:checked');
             if (selected.length === 0) return;
-            if (confirm(`¿Eliminar ${selected.length} archivos?`)) {
+
+            if (confirm(`¿Eliminar ${selected.length} archivos seleccionados?`)) {
+                let deleted = 0;
                 for (const checkbox of selected) {
-                    await Filesystem.deleteFile({ path: checkbox.dataset.path, directory: Directory.ExternalStorage });
+                    try {
+                        await Filesystem.deleteFile({ path: checkbox.dataset.path, directory: 'EXTERNAL_STORAGE' });
+                        deleted++;
+                    } catch (e) {
+                        alert('No se pudo borrar ' + checkbox.dataset.path + ': ' + (e.message || e));
+                    }
                 }
+                alert(`Se eliminaron ${deleted} archivos.`);
                 scan();
             }
         }
