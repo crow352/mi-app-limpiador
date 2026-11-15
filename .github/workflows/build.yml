@@ -23,11 +23,24 @@ jobs:
           distribution: 'temurin'
           java-version: '21'
 
-      - name: Instalar dependencias y crear Android
+      - name: Instalar dependencias y configurar Android
         run: |
           npm install
           npx cap add android
-          sed -i 's|<application|<uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>\n    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>\n    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE"/>\n    <application|g' android/app/src/main/AndroidManifest.xml
+          python3 -c '
+          p = "android/app/src/main/AndroidManifest.xml"
+          txt = open(p).read()
+          perms = """
+              <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+              <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+              <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
+              <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+              <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
+          """
+          txt = txt.replace("<application", perms + "\n    <application", 1)
+          open(p, "w").write(txt)
+          print(open(p).read())
+          '
           npx cap sync android
 
       - name: Compilar APK Debug
