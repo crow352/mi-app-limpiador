@@ -5,87 +5,133 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Limpiador</title>
     <style>
-        body { background: #121212; color: #e0e0e0; font-family: sans-serif; padding: 20px; }
-        .btn { background: #bb86fc; color: #000; border: none; padding: 15px; width: 100%; border-radius: 8px; font-weight: bold; margin-bottom: 15px; font-size: 16px; }
-        .btn-danger { background: #cf6679; }
+        body { background: #121212; color: #e0e0e0; font-family: sans-serif; padding: 20px; padding-bottom: 90px; }
+        .btn { background: #bb86fc; color: #000; border: none; padding: 15px; width: 100%; border-radius: 8px; font-weight: bold; margin-bottom: 12px; font-size: 16px; }
+        .btn-sec { background: #2c2c2c; color: #e0e0e0; padding: 10px; font-size: 14px; }
+        .btn-danger { background: #cf6679; color: #000; }
         #status { background: #1e1e1e; padding: 12px; border-radius: 8px; margin-bottom: 15px; font-size: 14px; color: #03dac6; }
-        .file-item { display: flex; align-items: center; padding: 12px 5px; border-bottom: 1px solid #333; word-break: break-all; }
-        .file-item input { margin-right: 12px; transform: scale(1.3); }
-        #total { margin: 20px 0; font-weight: bold; font-size: 18px; }
+        .cat-title { color: #bb86fc; font-weight: bold; margin-top: 18px; margin-bottom: 8px; border-bottom: 1px solid #333; padding-bottom: 4px; }
+        .file-item { display: flex; align-items: center; padding: 10px 5px; border-bottom: 1px solid #262626; word-break: break-all; font-size: 14px; }
+        .file-item input { margin-right: 12px; transform: scale(1.3); flex-shrink: 0; }
+        .footer-bar { position: fixed; bottom: 0; left: 0; right: 0; background: #1e1e1e; padding: 12px 20px; border-top: 1px solid #333; }
+        #total { margin-bottom: 8px; font-weight: bold; font-size: 16px; }
     </style>
 </head>
 <body>
-    <h1>Limpiador</h1>
-    <button class="btn" onclick="scan()">Escanear carpetas seguras</button>
-    <div id="status">Listo para escanear.</div>
+    <h1>Limpiador Seguro</h1>
+    <button class="btn" onclick="scan()">Escanear almacenamiento</button>
+    <div id="status">Toca escanear para buscar archivos seguros de limpiar.</div>
+    <button id="toggleBtn" class="btn btn-sec" style="display:none;" onclick="toggleAll()">Marcar / Desmarcar todos</button>
     <div id="results"></div>
-    <div id="total">Total seleccionado: 0.00 MB</div>
-    <button class="btn btn-danger" onclick="deleteFiles()">Eliminar seleccionados</button>
+
+    <div class="footer-bar">
+        <div id="total">Total seleccionado: 0.00 MB</div>
+        <button class="btn btn-danger" style="margin-bottom:0;" onclick="deleteFiles()">Eliminar seleccionados</button>
+    </div>
 
     <script>
+        let allChecked = false;
+
         async function scan() {
             const status = document.getElementById('status');
             const container = document.getElementById('results');
+            const toggleBtn = document.getElementById('toggleBtn');
             container.innerHTML = '';
+            toggleBtn.style.display = 'none';
+            allChecked = false;
             document.getElementById('total').innerText = 'Total seleccionado: 0.00 MB';
 
-            try {
-                const Filesystem = window.Capacitor?.Plugins?.Filesystem;
-                if (!Filesystem) {
-                    status.innerText = 'Error: Plugin Filesystem no cargado.';
-                    return;
-                }
+            const Filesystem = window.Capacitor?.Plugins?.Filesystem;
+            if (!Filesystem) {
+                status.innerText = 'Error: Plugin Filesystem no cargado.';
+                return;
+            }
 
-                status.innerText = 'Verificando permisos...';
-                try { await Filesystem.requestPermissions(); } catch (e) {}
+            status.innerText = 'Escaneando carpetas...';
+            try { await Filesystem.requestPermissions(); } catch (e) {}
 
-                const paths = ['Download', 'Pictures/Screenshots', 'DCIM/Screenshots'];
-                let count = 0;
+            const groups = {
+                '📦 Instaladores y ZIPs (Download)': [],
+                '🗑️ Temporales y residuos': [],
+                '📸 Capturas de pantalla': [],
+                '🐘 Archivos grandes (+5 MB en Download)': []
+            };
 
-                for (const path of paths) {
-                    status.innerText = `Escaneando ${path}...`;
-                    try {
-                        const contents = await Filesystem.readdir({ path, directory: 'EXTERNAL_STORAGE' });
-                        for (const file of contents.files) {
-                            if (file.type === 'directory') continue;
-                            const sizeMB = (file.size || 0) / (1024 * 1024);
-                            const ext = file.name.split('.').pop().toLowerCase();
+            const paths = ['Download', 'Pictures/Screenshots', 'DCIM/Screenshots'];
+            let permissionError = false;
 
-                            if (['apk', 'tmp', 'log', 'bak'].includes(ext) || (path === 'Download' && sizeMB > 10)) {
-                                count++;
-                                const div = document.createElement('div');
-                                div.className = 'file-item';
-                                div.innerHTML = `<input type="checkbox" data-path="${path}/${file.name}" data-size="${sizeMB}" onchange="updateTotal()"> <span><b>[${path}]</b> ${file.name} (${sizeMB.toFixed(2)} MB)</span>`;
-                                container.appendChild(div);
-                            }
+            for (const path of paths) {
+                try {
+                    const contents = await Filesystem.readdir({ path, directory: 'EXTERNAL_STORAGE' });
+                    for (const file of contents.files) {
+                        if (file.type === 'directory') continue;
+                        const sizeMB = (file.size || 0) / (1024 * 1024);
+                        const ext = file.name.split('.').pop().toLowerCase();
+                        const item = { path: `${path}/${file.name}`, name: file.name, sizeMB };
+
+                        if (['apk', 'zip', 'rar'].includes(ext)) {
+                            groups['📦 Instaladores y ZIPs (Download)'].push(item);
+                        } else if (['tmp', 'temp', 'log', 'bak'].includes(ext)) {
+                            groups['🗑️ Temporales y residuos'].push(item);
+                        } else if (path.includes('Screenshots')) {
+                            groups['📸 Capturas de pantalla'].push(item);
+                        } else if (path === 'Download' && sizeMB > 5) {
+                            groups['🐘 Archivos grandes (+5 MB en Download)'].push(item);
                         }
-                    } catch (err) {
-                        status.innerText = `Aviso en ${path}: ${err.message || err}. Revisa permisos de archivos en Ajustes.`;
+                    }
+                } catch (err) {
+                    const msg = (err.message || '').toLowerCase();
+                    if (!msg.includes('does not exist')) {
+                        permissionError = true;
                     }
                 }
-
-                if (count > 0) {
-                    status.innerText = `Escaneo listo: ${count} archivos encontrados.`;
-                } else if (!status.innerText.startsWith('Aviso')) {
-                    status.innerText = 'Escaneo terminado: No se encontraron archivos basura o pesados.';
-                }
-            } catch (globalErr) {
-                status.innerText = 'Error: ' + (globalErr.message || globalErr);
             }
+
+            let totalFound = 0;
+            for (const [title, items] of Object.entries(groups)) {
+                if (items.length === 0) continue;
+                totalFound += items.length;
+                const h = document.createElement('div');
+                h.className = 'cat-title';
+                h.innerText = `${title} (${items.length})`;
+                container.appendChild(h);
+
+                for (const item of items) {
+                    const div = document.createElement('div');
+                    div.className = 'file-item';
+                    div.innerHTML = `<input type="checkbox" class="file-chk" data-path="${item.path}" data-size="${item.sizeMB}" onchange="updateTotal()"> <span>${item.name} <b>(${item.sizeMB.toFixed(2)} MB)</b></span>`;
+                    container.appendChild(div);
+                }
+            }
+
+            if (totalFound > 0) {
+                status.innerText = `Listo: ${totalFound} archivos seguros para revisar.`;
+                toggleBtn.style.display = 'block';
+            } else if (permissionError) {
+                status.innerText = 'Sin acceso a archivos: Ve a Ajustes > Apps > Mi App Limpiador > Permisos y activa "Acceso a todos los archivos".';
+            } else {
+                status.innerText = '¡Todo limpio! No se encontraron archivos en estas categorías.';
+            }
+        }
+
+        function toggleAll() {
+            allChecked = !allChecked;
+            document.querySelectorAll('.file-chk').forEach(c => c.checked = allChecked);
+            updateTotal();
         }
 
         function updateTotal() {
             let total = 0;
-            document.querySelectorAll('input:checked').forEach(i => total += parseFloat(i.dataset.size));
+            document.querySelectorAll('.file-chk:checked').forEach(i => total += parseFloat(i.dataset.size));
             document.getElementById('total').innerText = `Total seleccionado: ${total.toFixed(2)} MB`;
         }
 
         async function deleteFiles() {
             const Filesystem = window.Capacitor?.Plugins?.Filesystem;
-            const selected = document.querySelectorAll('input:checked');
+            const selected = document.querySelectorAll('.file-chk:checked');
             if (selected.length === 0) return;
 
-            if (confirm(`¿Eliminar ${selected.length} archivos seleccionados?`)) {
+            if (confirm(`¿Eliminar ${selected.length} archivos seleccionados? Esta acción no se puede deshacer.`)) {
                 let deleted = 0;
                 for (const checkbox of selected) {
                     try {
